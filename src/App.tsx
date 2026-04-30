@@ -240,8 +240,11 @@ export default function App() {
           <Info className="w-5 h-5 text-brand-primary" />
         </div>
         <div className="text-xs leading-[1.6] text-white/50">
-          회차별 정원은 <b className="text-brand-gold font-bold">{MAX_CAPACITY}명</b>으로 제한됩니다.<br />
           정원에 따라 <span className="text-emerald-300 font-bold">원활</span> · <span className="text-amber-300 font-bold">임박</span> · <span className="text-red-400 font-bold">마감</span> 상태가 실시간 반영됩니다.
+          <div className="mt-2 pt-2 border-t border-white/5 font-medium">
+            아래 통화 버튼을 누르면 상담원과 연결됩니다.<br />
+            상담원과 통화 후 최종 예약이 확정됩니다.
+          </div>
         </div>
       </motion.div>
 
