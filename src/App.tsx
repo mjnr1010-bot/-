@@ -73,11 +73,13 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setIsUserAdmin(u?.email === BOOTSTRAP_ADMIN_EMAIL);
+      const isEmailAdmin = u?.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
+      setIsUserAdmin(!!isEmailAdmin);
       if (!u) setIsAdminMode(false);
       setAuthLoading(false);
     });
@@ -136,10 +138,16 @@ export default function App() {
   };
 
   const handleLogin = async () => {
+    setLoginError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login Error:", err);
+      if (err.code === "auth/popup-blocked") {
+        setLoginError("팝업이 차단되었습니다. 브라우저 설정을 확인하거나 새 탭에서 열어주세요.");
+      } else {
+        setLoginError("로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
     }
   };
 
@@ -291,9 +299,17 @@ export default function App() {
                          <Lock className="w-6 h-6 text-white/20" />
                        </div>
                        <h4 className="text-sm font-bold mb-2">Restricted Access</h4>
-                       <p className="text-xs text-white/40 mb-8 leading-relaxed px-4 text-pretty">
+                       <p className="text-xs text-white/40 mb-4 leading-relaxed px-4 text-pretty">
                          관리자 모드는 승인된 계정으로 로그인한<br />관리자만 접근할 수 있습니다.
                        </p>
+                       <p className="text-[10px] text-brand-gold/60 mb-8 font-bold animate-pulse">
+                         TIP: 로그인이 되지 않을 경우 브라우저 상단의<br />'새 탭에서 열기' 버튼을 이용해 주세요.
+                       </p>
+                       {loginError && (
+                         <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] font-bold">
+                           {loginError}
+                         </div>
+                       )}
                        <button 
                         onClick={handleLogin}
                         className="w-full h-14 bg-white text-bg-deep rounded-2xl flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase active:scale-95 transition-transform"
