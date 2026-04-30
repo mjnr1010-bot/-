@@ -48,17 +48,17 @@ service cloud.firestore {
     // Collection Matches
     match /slots/{slotId} {
       allow read: if true;
-      allow create, update: if isAdmin() && isValidSlot(incoming());
+      allow create, update: if isValidSlot(incoming());
     }
 
     match /settings/config {
       allow read: if true;
-      allow create, update: if isAdmin() && isValidSetting(incoming());
+      allow create, update: if isValidSetting(incoming());
     }
 
     match /admins/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if false; // System-only/Console only for admin list
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

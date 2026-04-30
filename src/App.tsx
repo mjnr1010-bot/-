@@ -70,21 +70,12 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   
-  const [user, setUser] = useState<User | null>(null);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [isUserAdmin, setIsUserAdmin] = useState(() => {
+    return sessionStorage.getItem("adminSession") === "true";
+  });
+  const [adminId, setAdminId] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      const isEmailAdmin = u?.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL.toLowerCase();
-      setIsUserAdmin(!!isEmailAdmin);
-      if (!u) setIsAdminMode(false);
-      setAuthLoading(false);
-    });
-    return unsubscribe;
-  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -137,27 +128,23 @@ export default function App() {
     }
   };
 
-  const handleLogin = async () => {
-    setLoginError(null);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err: any) {
-      console.error("Login Error:", err);
-      if (err.code === "auth/popup-blocked") {
-        setLoginError("팝업이 차단되었습니다. 브라우저 설정을 확인하거나 새 탭에서 열어주세요.");
-      } else {
-        setLoginError("로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-      }
+  const handleLogin = () => {
+    if (adminId === "admin1" && adminPassword === "acrowin0530!") {
+      setIsUserAdmin(true);
+      sessionStorage.setItem("adminSession", "true");
+      setLoginError(null);
+    } else {
+      setLoginError("아이디 또는 비밀번호가 일치하지 않습니다.");
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setShowAdminPanel(false);
-    } catch (err) {
-      console.error("Logout Error:", err);
-    }
+  const handleLogout = () => {
+    setIsUserAdmin(false);
+    setIsAdminMode(false);
+    sessionStorage.removeItem("adminSession");
+    setShowAdminPanel(false);
+    setAdminId("");
+    setAdminPassword("");
   };
 
   const getStatus = (count: number) => {
@@ -288,63 +275,54 @@ export default function App() {
                 </div>
                 
                 <div className="space-y-6">
-                  {authLoading ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-4">
-                      <Loader2 className="w-8 h-8 text-brand-primary animate-spin" />
-                      <p className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Checking Authentication...</p>
-                    </div>
-                  ) : !user ? (
-                    <div className="text-center py-8">
+                  {!isUserAdmin ? (
+                    <div className="text-center py-4">
                        <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
                          <Lock className="w-6 h-6 text-white/20" />
                        </div>
-                       <h4 className="text-sm font-bold mb-2">Restricted Access</h4>
-                       <p className="text-xs text-white/40 mb-4 leading-relaxed px-4 text-pretty">
-                         관리자 모드는 승인된 계정으로 로그인한<br />관리자만 접근할 수 있습니다.
-                       </p>
-                       <p className="text-[10px] text-brand-gold/60 mb-8 font-bold animate-pulse">
-                         TIP: 로그인이 되지 않을 경우 브라우저 상단의<br />'새 탭에서 열기' 버튼을 이용해 주세요.
-                       </p>
+                       <h4 className="text-sm font-bold mb-6">Admin Authentication</h4>
+                       
+                       <div className="space-y-3 mb-6">
+                         <input 
+                           type="text" 
+                           placeholder="ID"
+                           value={adminId}
+                           onChange={(e) => setAdminId(e.target.value)}
+                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-brand-primary/50"
+                         />
+                         <input 
+                           type="password" 
+                           placeholder="Password"
+                           value={adminPassword}
+                           onChange={(e) => setAdminPassword(e.target.value)}
+                           onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-brand-primary/50"
+                         />
+                       </div>
+
                        {loginError && (
                          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] font-bold">
                            {loginError}
                          </div>
                        )}
+
                        <button 
                         onClick={handleLogin}
                         className="w-full h-14 bg-white text-bg-deep rounded-2xl flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase active:scale-95 transition-transform"
                        >
-                         <LogIn className="w-5 h-5" />
-                         Login with Google
+                         Login
                        </button>
-                    </div>
-                  ) : !isUserAdmin ? (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
-                        <XCircle className="w-6 h-6 text-red-400" />
-                      </div>
-                      <h4 className="text-sm font-bold mb-2">Access Denied</h4>
-                      <p className="text-xs text-white/40 mb-8 leading-relaxed">
-                        계정({user.email})은 관리자 권한이 없습니다.
-                      </p>
-                      <button 
-                        onClick={handleLogout}
-                        className="w-full h-14 border border-white/10 rounded-2xl flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase active:scale-95 transition-transform text-red-300"
-                      >
-                        <LogOut className="w-5 h-5" />
-                        Switch Account / Logout
-                      </button>
                     </div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 mb-2">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center text-[10px] font-bold">
-                            {user.email?.[0].toUpperCase()}
+                            A
                           </div>
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Authorized Admin</p>
-                            <p className="text-[11px] text-white/40">{user.email}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Authorized Session</p>
+                            <p className="text-[11px] text-white/40">admin1 (Administrator)</p>
                           </div>
                         </div>
                         <button onClick={handleLogout} className="p-2 text-white/20 hover:text-red-300 transition-colors">
