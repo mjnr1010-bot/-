@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #d8c4ff;
+  --color-brand-gold: #f2dc9b;
+  --color-bg-deep: #0a0514;
+  --color-bg-violet: #1a0b2e;
+  --font-sans: "Inter", "Noto Sans KR", ui-sans-serif, system-ui;
+  --font-serif: "Cormorant Garamond", serif;
+}
+
+@layer base {
+  :root {
+    --sab: env(safe-area-inset-bottom);
+    --sat: env(safe-area-inset-top);
+  }
+
+  body {
+    @apply bg-bg-deep text-white antialiased selection:bg-brand-primary/30;
+    background: radial-gradient(circle at 50% 0%, #1e0e36 0%, #0a0514 100%);
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+}
+
+.glass-card {
+  @apply bg-white/[0.03] border border-white/[0.08] backdrop-blur-2xl rounded-[2rem];
+}
+
+.status-badge {
+  @apply inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest;
+}
+
+.btn-luxury {
+  @apply relative overflow-hidden bg-brand-primary text-bg-deep font-black rounded-2xl transition-all duration-300 active:scale-[0.97] active:brightness-90;
+  background: linear-gradient(135deg, #d8bcff 0%, #9b6cff 100%);
+  box-shadow: 0 8px 32px -8px rgba(155, 108, 255, 0.5);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
