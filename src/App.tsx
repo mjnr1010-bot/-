@@ -15,11 +15,31 @@ import {
   Eye,
   EyeOff,
   Save,
-  Info
+  Info,
+  LogIn,
+  LogOut,
+  Loader2,
+  Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { 
+  auth, 
+  db, 
+  googleProvider, 
+  signInWithPopup, 
+  signOut,
+  onSnapshot,
+  doc,
+  setDoc,
+  serverTimestamp,
+  handleFirestoreError,
+  OperationType
+} from "./lib/firebase";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { collection } from "firebase/firestore";
 
 const MAX_CAPACITY = 10;
+const BOOTSTRAP_ADMIN_EMAIL = "mjnr1010@gmail.com";
 
 const SCHEDULE_DATA = [
   { date: "5/16(토)", times: ["14:00", "16:00", "18:00", "20:00"] },
@@ -38,20 +58,31 @@ const SCHEDULE_DATA = [
   { date: "5/29(금)", times: ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"] },
 ];
 
+const getSafeKey = (date: string, time: string) => {
+  return `${date}-${time}`.replace(/[\/\(\)\s:]/g, "_");
+};
+
 export default function App() {
-  const [counts, setCounts] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem("reservationCounts");
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [phone, setPhone] = useState(() => localStorage.getItem("reservePhone") || "02-123-4567");
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [phone, setPhone] = useState("02-123-4567");
   const [tempPhone, setTempPhone] = useState(phone);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem("reservationCounts", JSON.stringify(counts));
-  }, [counts]);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setIsUserAdmin(u?.email === BOOTSTRAP_ADMIN_EMAIL);
+      if (!u) setIsAdminMode(false);
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -59,14 +90,66 @@ export default function App() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleUpdateCount = (key: string, value: number) => {
+  useEffect(() => {
+    const unsubConfig = onSnapshot(doc(db, "settings", "config"), (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.data().phoneNumber;
+        setPhone(val);
+        setTempPhone(val);
+      }
+    }, (err) => handleFirestoreError(err, OperationType.GET, "settings/config"));
+
+    const unsubSlots = onSnapshot(collection(db, "slots"), (snapshot) => {
+      const newCounts: Record<string, number> = {};
+      snapshot.forEach(doc => {
+        newCounts[doc.id] = doc.data().count;
+      });
+      setCounts(newCounts);
+    }, (err) => handleFirestoreError(err, OperationType.GET, "slots"));
+
+    return () => {
+      unsubConfig();
+      unsubSlots();
+    };
+  }, []);
+
+  const handleUpdateCount = async (key: string, value: number) => {
     const newVal = Math.max(0, Math.min(MAX_CAPACITY, value));
-    setCounts(prev => ({ ...prev, [key]: newVal }));
+    try {
+      await setDoc(doc(db, "slots", key), {
+        count: newVal,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `slots/${key}`);
+    }
   };
 
-  const handleSavePhone = () => {
-    setPhone(tempPhone);
-    localStorage.setItem("reservePhone", tempPhone);
+  const handleSavePhone = async () => {
+    try {
+      await setDoc(doc(db, "settings", "config"), {
+        phoneNumber: tempPhone
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, "settings/config");
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      console.error("Login Error:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setShowAdminPanel(false);
+    } catch (err) {
+      console.error("Logout Error:", err);
+    }
   };
 
   const getStatus = (count: number) => {
@@ -197,36 +280,94 @@ export default function App() {
                 </div>
                 
                 <div className="space-y-6">
-                  <div>
-                    <label className="block text-[10px] uppercase font-black text-white/30 mb-3 ml-1 tracking-widest">Master Phone Number</label>
-                    <div className="flex gap-3">
-                      <input 
-                        type="text" 
-                        value={tempPhone}
-                        onChange={(e) => setTempPhone(e.target.value)}
-                        placeholder="예: 02-123-4567"
-                        className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-brand-primary/50"
-                      />
+                  {authLoading ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-4">
+                      <Loader2 className="w-8 h-8 text-brand-primary animate-spin" />
+                      <p className="text-[10px] uppercase font-bold text-white/30 tracking-widest">Checking Authentication...</p>
+                    </div>
+                  ) : !user ? (
+                    <div className="text-center py-8">
+                       <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6">
+                         <Lock className="w-6 h-6 text-white/20" />
+                       </div>
+                       <h4 className="text-sm font-bold mb-2">Restricted Access</h4>
+                       <p className="text-xs text-white/40 mb-8 leading-relaxed px-4 text-pretty">
+                         관리자 모드는 승인된 계정으로 로그인한<br />관리자만 접근할 수 있습니다.
+                       </p>
+                       <button 
+                        onClick={handleLogin}
+                        className="w-full h-14 bg-white text-bg-deep rounded-2xl flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase active:scale-95 transition-transform"
+                       >
+                         <LogIn className="w-5 h-5" />
+                         Login with Google
+                       </button>
+                    </div>
+                  ) : !isUserAdmin ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
+                        <XCircle className="w-6 h-6 text-red-400" />
+                      </div>
+                      <h4 className="text-sm font-bold mb-2">Access Denied</h4>
+                      <p className="text-xs text-white/40 mb-8 leading-relaxed">
+                        계정({user.email})은 관리자 권한이 없습니다.
+                      </p>
                       <button 
-                        onClick={() => { handleSavePhone(); setShowAdminPanel(false); }}
-                        className="w-14 bg-brand-primary text-bg-deep rounded-2xl flex items-center justify-center active:scale-90 transition-transform"
+                        onClick={handleLogout}
+                        className="w-full h-14 border border-white/10 rounded-2xl flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase active:scale-95 transition-transform text-red-300"
                       >
-                        <Save className="w-5 h-5" />
+                        <LogOut className="w-5 h-5" />
+                        Switch Account / Logout
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-brand-primary/20 flex items-center justify-center text-[10px] font-bold">
+                            {user.email?.[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Authorized Admin</p>
+                            <p className="text-[11px] text-white/40">{user.email}</p>
+                          </div>
+                        </div>
+                        <button onClick={handleLogout} className="p-2 text-white/20 hover:text-red-300 transition-colors">
+                          <LogOut className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                  <button 
-                    onClick={() => setIsAdmin(!isAdmin)}
-                    className={`w-full py-5 rounded-2xl border flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase transition-all ${
-                      isAdmin 
-                      ? "bg-brand-primary text-bg-deep border-brand-primary" 
-                      : "bg-white/5 border-white/10 text-white/40"
-                    }`}
-                  >
-                    {isAdmin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    {isAdmin ? "Exit Edit Mode" : "Enter Edit Mode"}
-                  </button>
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/30 mb-3 ml-1 tracking-widest">Master Phone Number</label>
+                        <div className="flex gap-3">
+                          <input 
+                            type="text" 
+                            value={tempPhone}
+                            onChange={(e) => setTempPhone(e.target.value)}
+                            placeholder="예: 02-123-4567"
+                            className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-brand-primary/50"
+                          />
+                          <button 
+                            onClick={handleSavePhone}
+                            className="w-14 bg-brand-primary text-bg-deep rounded-2xl flex items-center justify-center active:scale-90 transition-transform"
+                          >
+                            <Save className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setIsAdminMode(!isAdminMode)}
+                        className={`w-full py-5 rounded-2xl border flex items-center justify-center gap-3 font-black text-xs tracking-widest uppercase transition-all ${
+                          isAdminMode 
+                          ? "bg-brand-primary text-bg-deep border-brand-primary" 
+                          : "bg-white/5 border-white/10 text-white/40"
+                        }`}
+                      >
+                        {isAdminMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {isAdminMode ? "Exit Edit Mode" : "Enter Edit Mode"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -259,7 +400,7 @@ export default function App() {
 
             <div className="grid gap-3">
               {day.times.map((time) => {
-                const key = `${day.date}-${time}`;
+                const key = getSafeKey(day.date, time);
                 const count = counts[key] || 0;
                 const status = getStatus(count);
 
@@ -283,14 +424,14 @@ export default function App() {
                         {status.text}
                       </span>
                       
-                      {isAdmin && (
+                      {isAdminMode && (
                         <div className="flex items-center bg-black/40 rounded-xl border border-brand-primary/20 p-1">
                           <input 
                             type="number"
                             min="0"
                             max={MAX_CAPACITY}
                             value={count}
-                            onChange={(e) => handleUpdateCount(key, parseInt(e.target.value) || 0)}
+                            onChange={(e) => handleUpdateCount(getSafeKey(day.date, time), parseInt(e.target.value) || 0)}
                             className="w-10 h-8 bg-transparent text-center font-black text-sm focus:outline-none text-brand-primary"
                           />
                         </div>

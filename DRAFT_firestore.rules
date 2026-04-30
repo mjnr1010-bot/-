@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() 
+        && request.auth.token.email_verified == true
+        && (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+          || request.auth.token.email == "mjnr1010@gmail.com"
+        );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+    function isValidSlot(data) {
+      return data.keys().hasAll(['count', 'updatedAt']) && data.keys().size() == 2
+        && data.count is int && data.count >= 0 && data.count <= 10
+        && data.updatedAt == request.time;
+    }
+
+    function isValidSetting(data) {
+      return data.keys().hasAll(['phoneNumber']) && data.keys().size() == 1
+        && data.phoneNumber is string && data.phoneNumber.size() <= 20;
+    }
+
+    // 8. Secure List Queries / Resource Guards
+    match /slots/{slotId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidSlot(incoming());
+    }
+
+    match /settings/config {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidSetting(incoming());
+    }
+
+    match /admins/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+  }
+}

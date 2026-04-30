@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Slot": {
+      "title": "Reservation Slot",
+      "description": "A time slot with a reservation count.",
+      "type": "object",
+      "properties": {
+        "count": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["count", "updatedAt"]
+    },
+    "Setting": {
+      "title": "Application Settings",
+      "description": "Global settings like phone number.",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string" }
+      },
+      "required": ["phoneNumber"]
+    },
+    "Admin": {
+      "title": "Admin Record",
+      "description": "UID-indexed admin records.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/slots/{slotId}": {
+      "schema": "Slot",
+      "description": "Real-time reservation counts for specific time slots."
+    },
+    "/settings/config": {
+      "schema": "Setting",
+      "description": "Global configuration including the contact phone number."
+    },
+    "/admins/{userId}": {
+      "schema": "Admin",
+      "description": "List of administrative users."
+    }
+  }
+}
