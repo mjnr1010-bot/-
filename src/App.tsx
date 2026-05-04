@@ -38,7 +38,7 @@ import {
 import { onAuthStateChanged, User } from "firebase/auth";
 import { collection } from "firebase/firestore";
 
-const MAX_CAPACITY = 10;
+const MAX_CAPACITY = 8;
 const BOOTSTRAP_ADMIN_EMAIL = "mjnr1010@gmail.com";
 
 const SCHEDULE_DATA = [
@@ -149,7 +149,7 @@ export default function App() {
 
   const getStatus = (count: number) => {
     if (count >= MAX_CAPACITY) return { text: "마감", cls: "bg-red-500/10 text-red-300 border border-red-500/20", icon: <XCircle className="w-2.5 h-2.5 mr-1" /> };
-    if (count >= 7) return { text: "마감임박", cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20", icon: <AlertCircle className="w-2.5 h-2.5 mr-1" /> };
+    if (count >= 6) return { text: "마감임박", cls: "bg-amber-500/10 text-amber-300 border border-amber-500/20", icon: <AlertCircle className="w-2.5 h-2.5 mr-1" /> };
     return { text: "예약가능", cls: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20", icon: <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> };
   };
 
@@ -405,9 +405,11 @@ export default function App() {
                   <div 
                     key={time}
                     className={`flex items-center justify-between p-5 rounded-[1.5rem] border transition-all duration-500 ${
-                      count >= MAX_CAPACITY 
-                      ? `bg-black/40 border-white/5 grayscale opacity-40 ${!isAdminMode ? "pointer-events-none" : ""}` 
-                      : "bg-white/[0.04] border-white/[0.04] hover:bg-white/[0.07]"
+                      count >= MAX_CAPACITY && !isAdminMode
+                      ? "bg-black/40 border-white/5 grayscale opacity-40 pointer-events-none" 
+                      : (count >= MAX_CAPACITY && isAdminMode 
+                          ? "bg-white/[0.08] border-brand-primary/30" 
+                          : "bg-white/[0.04] border-white/[0.04] hover:bg-white/[0.07]")
                     }`}
                   >
                     <div className="flex items-center gap-5">
