@@ -406,7 +406,7 @@ export default function App() {
                     key={time}
                     className={`flex items-center justify-between p-5 rounded-[1.5rem] border transition-all duration-500 ${
                       count >= MAX_CAPACITY 
-                      ? "bg-black/40 border-white/5 grayscale pointer-events-none opacity-40" 
+                      ? `bg-black/40 border-white/5 grayscale opacity-40 ${!isAdminMode ? "pointer-events-none" : ""}` 
                       : "bg-white/[0.04] border-white/[0.04] hover:bg-white/[0.07]"
                     }`}
                   >
